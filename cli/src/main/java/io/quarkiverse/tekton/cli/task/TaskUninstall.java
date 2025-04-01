@@ -27,45 +27,50 @@ public class TaskUninstall extends AbstractTaskCommand {
 
     @Override
     public void process(List<HasMetadata> resources) {
-        if (taskName.isEmpty() && !all) {
-            throw new IllegalArgumentException("A task name or --all flag must be specified.");
-        }
-
-        readInstalledTasks();
-        readProjectTasks(resources);
-        List<String> uninstalled = new ArrayList<>();
-
-        for (String name : getProjectTaskNames()) {
-            if (!all && taskName.filter(n -> !n.equals(name)).isPresent()) {
-                continue;
+        System.out.println("Uninstalling tasks...");
+        try {
+            if (taskName.isEmpty() && !all) {
+                throw new IllegalArgumentException("A task name or --all flag must be specified.");
             }
 
-            getProjectTask(name).ifPresentOrElse(resource -> {
-                if (resource instanceof io.fabric8.tekton.v1.Task v1Task) {
-                    Clients.kubernetes().resource(v1Task).delete();
-                    if (removeInstalledTask(v1Task) != null) {
-                        uninstalled.add(name);
-                    } else {
-                        System.out.println("Task " + name + " not installed.");
-                    }
+            readInstalledTasks();
+            readProjectTasks(resources);
+            List<String> uninstalled = new ArrayList<>();
 
-                } else if (resource instanceof io.fabric8.tekton.v1beta1.Task v1beta1Task) {
-                    Clients.kubernetes().resource(v1beta1Task).delete();
-                    if (removeInstalledTask(v1beta1Task) != null) {
-                        uninstalled.add(name);
-                    } else {
-                        System.out.println("Task " + name + " not installed.");
-                    }
+            for (String name : getProjectTaskNames()) {
+                if (!all && taskName.filter(n -> !n.equals(name)).isPresent()) {
+                    continue;
                 }
-            }, () -> System.out.println("Task " + name + " not found."));
-        }
 
-        if (uninstalled.isEmpty()) {
-            output.out().println("No tasks to uninstall.");
-            return;
+                getProjectTask(name).ifPresentOrElse(resource -> {
+                    if (resource instanceof io.fabric8.tekton.v1.Task v1Task) {
+                        Clients.kubernetes().resource(v1Task).delete();
+                        if (removeInstalledTask(v1Task) != null) {
+                            uninstalled.add(name);
+                        } else {
+                            System.out.println("Task " + name + " not installed.");
+                        }
+
+                    } else if (resource instanceof io.fabric8.tekton.v1beta1.Task v1beta1Task) {
+                        Clients.kubernetes().resource(v1beta1Task).delete();
+                        if (removeInstalledTask(v1beta1Task) != null) {
+                            uninstalled.add(name);
+                        } else {
+                            System.out.println("Task " + name + " not installed.");
+                        }
+                    }
+                }, () -> System.out.println("Task " + name + " not found."));
+            }
+
+            if (uninstalled.isEmpty()) {
+                output.out().println("No tasks to uninstall.");
+                return;
+            }
+            System.out.println("Uninstalled tasks:");
+            TaskTable table = new TaskTable(getTaskListItems(t -> uninstalled.contains(t.getName())));
+            table.print();
+        } catch (Exception e) {
+            e.printStackTrace(System.out);
         }
-        System.out.println("Uninstalled tasks:");
-        TaskTable table = new TaskTable(getTaskListItems(t -> uninstalled.contains(t.getName())));
-        table.print();
     }
 }
